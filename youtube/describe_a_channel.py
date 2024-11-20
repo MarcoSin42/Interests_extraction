@@ -1,7 +1,8 @@
 import ollama
-from get_title_and_caption import get_captions
+from get_title_and_caption import get_captions, get_n_videos
 
 import google.generativeai as genai
+from google.ai.generativelanguage_v1beta.types.generative_service import GenerateContentResponse
 import yt_dlp
 from enum import Enum
 
@@ -16,8 +17,42 @@ client_secrets_file = "/home/Marco/Projects/Interests_extraction/api_keys/client
 def llm_describe_channel(channel_id: str, limit: int  = 15):
     return None
 
+    """ Checks if the response is invalid, returns True if the LLM did not follow the response format dictated and False otherwise.
+    """
+def invalid_response(response: GenerateContentResponse) -> bool:
+    text = response.text
+    responseList = text.split("\n")
 
-def llm_describe_video(video_id: str):
+    # If these are not within the response, the LLM has not followed instructions
+    prepends = ["Category: ", "Sub-category: ", "Related categories: "] 
+
+    for i in range(len(prepends)):
+        if prepends[i] not in responseList[i]:
+            return True
+    
+    return False
+
+"""Parses a response from a GenerateContentResponse and puts the result into a dictionary
+"""
+def parse_response(response: GenerateContentResponse) -> dict:
+    if invalid_response(response=response):
+        raise Exception("The LLM has failed to follow the response format.")
+
+    text = response.text
+    lines = text.split("\n")
+    
+    result = {
+        "category": lines[0][len("Category: "):].strip(),
+        "sub-category": lines[1][len("Sub-category: "):].strip(),
+        "related":lines[2][len("Related categories: "):].split(", ")
+    }
+
+    result["related"] = [x.strip() for x in result["related"]]
+
+    return result
+
+
+def llm_describe_video(video_id: str) -> GenerateContentResponse:
     prompt:str  =  """
     You are given the title, description, and captions of a YouTube video.  Categorize this video using as few words as possible (ideally 1-3), for example, if a video is describing the tastes and rating a video game, categorize the video as being "gaming".  If possible, try to sub-categorize it, continuing with the earlier example, if the video is predominatly about the game "Factorio", then you should sub-categorize it as Factorio.
     YouTube's automated captioning system is somewhat imperfect and therefore you should be tolerant of any transcription errors it may make (mostly with regards to spelling and not semantic content) .  In addition, provide a list of top 5 possibly related categories.  You should always prioritize the captions and descriptions over the title and simply use the title to help affirm your determination.  Ignore any sponsored content contained within the caption and description unless the video is explicitly entirely about a sponsor's product.  
@@ -29,7 +64,6 @@ def llm_describe_video(video_id: str):
     Sub-category: [What sub-category you believe it falls under, this should be more specific than the category you've provided.  Reply N/A if you are unsure.]
     Related categories: [Top 5 related categories]
     Reason: [Why you categorized it this way]
-    \n
     """
     title = ""
     captions = get_captions(video_id)
@@ -55,4 +89,4 @@ def llm_describe_video(video_id: str):
 if __name__ == "__main__":
     response = llm_describe_video("rcQ0YQXGhpI")
 
-    print(response)
+    print(parse_response(response=response))
