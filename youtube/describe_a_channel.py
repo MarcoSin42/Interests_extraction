@@ -17,8 +17,8 @@ client_secrets_file = "/home/Marco/Projects/Interests_extraction/api_keys/client
 def llm_describe_channel(channel_id: str, limit: int  = 15):
     return None
 
-    """ Checks if the response is invalid, returns True if the LLM did not follow the response format dictated and False otherwise.
-    """
+""" Checks if the response is invalid, returns True if the LLM did not follow the response format dictated and False otherwise.
+"""
 def invalid_response(response: GenerateContentResponse) -> bool:
     text = response.text
     responseList = text.split("\n")
